@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       payment_method_types: ["card"],
       line_items: products.map((product: any) => ({
         price_data: {
-          currency: "usd",
+          currency: "",
           product_data: {
             name: product.productName,  // Correct 'name' key
             images: [product.imageUrl], // Correct 'images' key (plural)
@@ -42,6 +42,7 @@ export async function POST(req: Request) {
       cancel_url: `${req.headers.get("origin")}/cancel`,
     });
 
+    console.log("Stripe Checkout Session created:", session);
     return NextResponse.json({ url: session.url });
   } catch (error: any) {
     console.error("Stripe Checkout Error:", error.message);

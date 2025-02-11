@@ -26,7 +26,6 @@ export default function CartPage() {
     setCart(savedCart);
   }, []);
 
-  // Function to handle quantity changes
   const handleQuantityChange = (ProductID: string, action: string) => {
     const updatedCart = cart.map((item) => {
       if (item._id === ProductID) {
@@ -43,17 +42,84 @@ export default function CartPage() {
       return item;
     });
 
-    // Save the updated cart to localStorage and update state
     localStorage.setItem("cart", JSON.stringify(updatedCart));
     setCart(updatedCart);
   };
 
-  // Function to remove a product from the cart
   const handleRemoveFromCart = (ProductID: string) => {
     const updatedCart = cart.filter((item) => item._id !== ProductID);
     localStorage.setItem("cart", JSON.stringify(updatedCart));
     setCart(updatedCart);
   };
+
+  const HandleCheckout = async () => {
+    if (cart.length === 0) {
+      console.error("Cart is empty. Cannot proceed with checkout.");
+      return;
+    }
+  
+    console.log("Sending the following cart to checkout:", cart);
+  
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ products: cart }),
+      });
+  
+      console.log("Checkout response status:", response.status);
+      const responseBody = await response.json();
+      console.log("Checkout response body:", responseBody);
+  
+      if (!response.ok) {
+        console.error("Checkout failed:", responseBody.error || "Unknown error");
+        throw new Error("Checkout request failed");
+      }
+  
+      if (responseBody.url) {
+        localStorage.setItem("checkout_pending", "true");
+        window.location.href = responseBody.url;
+      } else {
+        console.error("Checkout failed: No URL provided");
+      }
+    } catch (error) {
+      console.error("Checkout error:", error);
+    }
+  };
+  
+  useEffect(() => {
+    const checkPaymentStatus = async () => {
+      if (localStorage.getItem("checkout_pending") === "true") {
+        try {
+          const response = await fetch("/api/checkpayment");
+
+          if (!response.ok) {
+            throw new Error("Payment check failed");
+          }
+
+          const contentType = response.headers.get("Content-Type");
+          if (contentType && contentType.includes("application/json")) {
+            const data = await response.json();
+
+            if (data.success) {
+              localStorage.removeItem("cart");
+              setCart([]);
+            }
+          } else {
+            throw new Error("Unexpected response format");
+          }
+
+          localStorage.removeItem("checkout_pending");
+        } catch (error) {
+          console.error("Failed to verify payment status:", error);
+        }
+      }
+    };
+
+    checkPaymentStatus();
+  }, []);
 
   return (
     <main className="w-full bg-gradient-to-r from-purple-700 to-slate-800">
@@ -66,7 +132,7 @@ export default function CartPage() {
             {cart.map((item) => (
               <div
                 key={item._id}
-                className="flex justify-between items-center mb-4 p-4 border-b border-black px-8 rounded-md shadow-md"
+                className="flex justify-between items-center mb-4 p-4 border-b border-black px-8 rounded-md shadow-2xl"
               >
                 <div className="flex-1">
                   <p className="font-semibold">{item.productName}</p>
@@ -104,11 +170,12 @@ export default function CartPage() {
         )}
 
         <div className="mt-6">
-          <Link href={"/checkout"}>
-            <button className="w-full bg-black text-white py-3 px-6 rounded-lg text-lg hover:bg-gray-800 transition-all duration-300">
-              CheckOut
-            </button>
-          </Link>
+          <button
+            className="w-full bg-black text-white py-3 px-6 rounded-lg text-lg hover:bg-gray-800 transition-all duration-300"
+            onClick={HandleCheckout}
+          >
+            CheckOut
+          </button>
         </div>
       </div>
     </main>
